@@ -163,6 +163,7 @@ type State struct {
 	Caches    []CacheStat  `json:"caches"`
 	Janitor   JanitorStat  `json:"janitor"`
 	Paused    bool         `json:"paused"` // scaling is paused: no new runners start
+	Memory    MemoryInfo   `json:"memory"`
 }
 
 // Failure is a job that ended badly, kept briefly for the alert engine.
@@ -188,6 +189,7 @@ type Hub struct {
 	janitor  JanitorStat
 	failures []Failure
 	paused   bool
+	memory   MemoryInfo
 }
 
 func New(cfg Config) *Hub {
@@ -196,6 +198,7 @@ func New(cfg Config) *Hub {
 		runners:  map[string]*RunnerInfo{},
 		queue:    map[int64]*QueuedJob{},
 		profiles: map[string]*Profile{},
+		memory:   BuildMemory(0, 0, 0, 0, 0, nil, nil),
 	}
 }
 
@@ -448,7 +451,7 @@ func (h *Hub) Snapshot() State {
 	st := State{
 		Now: ms(time.Now()), StartedMs: ms(h.started), Config: h.cfg, Decision: h.decision, Totals: h.totals,
 		Runners: []RunnerInfo{}, Queue: []QueuedJob{}, Jobs: []JobRecord{}, Profiles: []Profile{}, Events: []Event{},
-		Caches: append([]CacheStat{}, h.caches...), Janitor: h.janitor, Paused: h.paused,
+		Caches: append([]CacheStat{}, h.caches...), Janitor: h.janitor, Paused: h.paused, Memory: h.memory,
 	}
 	if n := len(h.points); n > 0 {
 		p := h.points[n-1]

@@ -36,6 +36,11 @@ type Signals struct {
 	SwapUsedMB  uint64
 	DiskFreeMB  uint64
 	DiskTotalMB uint64
+
+	// Swap traffic (KB/s, mean between samples, from /proc/vmstat pswpin/pswpout)
+	// and the RAM-backed /tmp (statfs; 0 when /tmp is not a tmpfs).
+	SwapInKBs, SwapOutKBs     float64
+	TmpfsUsedMB, TmpfsTotalMB uint64
 }
 
 // Params tunes the controller. Zero values are replaced by Defaults().

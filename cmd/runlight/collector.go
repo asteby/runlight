@@ -27,7 +27,17 @@ type collector struct {
 	lastTick time.Time
 	lastLim  int
 	lastNote string
+
+	// Swap section. The process scan walks /proc, so it runs at most every
+	// swapScanEvery, never on each tick.
+	scanSwap     func() []sysmon.SwapProc
+	tmpfsOf      func(path string) (usedMB, totalMB uint64, ok bool)
+	topSwap      []telemetry.SwapProc
+	lastSwapScan time.Time
 }
+
+// swapScanEvery is how often the "who uses swap" list is refreshed.
+const swapScanEvery = 30 * time.Second
 
 type cpuSample struct {
 	usec uint64
@@ -39,6 +49,8 @@ func newCollector(hub *telemetry.Hub, prodRel, runlightRel string, defMemMB, max
 		hub: hub, cores: runtime.NumCPU(),
 		prodRel: prodRel, runlightRl: runlightRel,
 		maxMemMB: maxMemMB,
+		scanSwap: func() []sysmon.SwapProc { return sysmon.TopSwap(telemetry.MaxTopSwap) },
+		tmpfsOf:  sysmon.Tmpfs,
 		prev:     map[string]cpuSample{}, lastLim: -1,
 	}
 	c.defMemMB.Store(defMemMB)
@@ -88,6 +100,7 @@ func (c *collector) record(now time.Time, s governor.Signals, gov *governor.Gove
 		Load1: s.LoadPerCore * whole,
 	}
 	c.hub.AddPoint(p)
+	c.hub.SetMemory(c.memoryInfo(now, s))
 
 	for _, name := range sc.Names() {
 		cg := sysmon.ReadCG(c.runlightRl + "/" + name + ".service")
@@ -159,4 +172,33 @@ func gb(mb float64) string {
 		return fmt.Sprintf("%.1f GB", mb/1024)
 	}
 	return fmt.Sprintf("%.0f MB", mb)
+}
+
+// memoryInfo builds the swap/tmpfs section for the dashboard. The expensive
+// per-process swap scan is refreshed at most every swapScanEvery and only
+// while something is in swap; the previous list is reused in between.
+func (c *collector) memoryInfo(now time.Time, s governor.Signals) telemetry.MemoryInfo {
+	if s.SwapUsedMB == 0 {
+		c.topSwap, c.lastSwapScan = nil, time.Time{}
+	} else if c.scanSwap != nil && now.Sub(c.lastSwapScan) >= swapScanEvery {
+		c.lastSwapScan = now
+		c.topSwap = c.topSwap[:0:0]
+		for _, p := range c.scanSwap() {
+			c.topSwap = append(c.topSwap, telemetry.SwapProc{PID: p.PID, Name: p.Name, MB: p.MB, Unit: p.Unit})
+		}
+	}
+	var tmp []telemetry.TmpfsInfo
+	if s.TmpfsTotalMB > 0 {
+		tmp = append(tmp, telemetry.TmpfsInfo{Path: "/tmp", UsedMB: s.TmpfsUsedMB, TotalMB: s.TmpfsTotalMB})
+	}
+	if c.tmpfsOf != nil {
+		if u, t, ok := c.tmpfsOf("/dev/shm"); ok && t > 0 {
+			tmp = append(tmp, telemetry.TmpfsInfo{Path: "/dev/shm", UsedMB: u, TotalMB: t})
+		}
+	}
+	psi := 0.0
+	if s.HasPSI {
+		psi = s.MemSome
+	}
+	return telemetry.BuildMemory(s.SwapUsedMB, s.SwapTotalMB, s.SwapInKBs, s.SwapOutKBs, psi, tmp, c.topSwap)
 }

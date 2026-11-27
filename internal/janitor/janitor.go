@@ -86,6 +86,7 @@ type Report struct {
 type Janitor struct {
 	Rules      []Rule
 	Ephemerals []Ephemeral
+	Tmps       []TmpRule
 	Interval   time.Duration
 
 	// Live returns the runner names alive right now and how many are busy.
@@ -103,11 +104,12 @@ type Janitor struct {
 	Tel    *telemetry.Hub
 	Log    *slog.Logger
 
-	now     func() time.Time
-	mu      sync.Mutex
-	last    time.Time
-	running bool            // a RunNow pass is in flight
-	baseCtx context.Context // context of Run, used by RunNow; nil before Run
+	now      func() time.Time
+	openScan func(roots []string) (map[string]bool, error) // test hook; default scans /proc
+	mu       sync.Mutex
+	last     time.Time
+	running  bool            // a RunNow pass is in flight
+	baseCtx  context.Context // context of Run, used by RunNow; nil before Run
 }
 
 // SetRules replaces the cache rules; the next pass uses them.
@@ -500,6 +502,12 @@ func (j *Janitor) Once(ctx context.Context) Report {
 			}
 			j.Tel.Eventf("prune", "Limpieza de %s: %s %d carpeta(s) de runners que ya no existen y liberó %s.", e.Root, verb, len(removed), human(freed))
 		}
+	}
+
+	if len(j.Tmps) > 0 && ctx.Err() == nil {
+		removed, freed := j.runTmp(j.Tmps, now, low)
+		rep.Freed += freed
+		rep.Removed = append(rep.Removed, removed...)
 	}
 
 	if low && rep.Freed == 0 {

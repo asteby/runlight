@@ -33,6 +33,7 @@ func newBackend(c config, log *slog.Logger) (backend.Backend, error) {
 		s.Nice = c.nice
 		s.RuntimeMax = c.runtimeMax
 		s.Env = c.envVars
+		s.NoSwap = c.noJobSwap
 		return s, nil
 	}
 	return nil, fmt.Errorf("unknown --backend %q", c.backendName)

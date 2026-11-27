@@ -66,6 +66,8 @@ type config struct {
 	listen       string
 	caches       multiFlag
 	ephemerals   multiFlag
+	tmpClean     multiFlag
+	noJobSwap    bool
 	janitorEvery time.Duration
 	janitorDry   bool
 	dashUser     string
@@ -99,6 +101,8 @@ func main() {
 	flag.StringVar(&c.listen, "listen", "127.0.0.1:9128", "address of the read-only dashboard (empty = disabled). Put it behind an authenticating proxy before exposing it")
 	flag.Var(&c.caches, "cache", "capped cache to keep in check: name=dir:capGB[:lru|idle[:minAgeHours]] (repeatable)")
 	flag.Var(&c.ephemerals, "cache-ephemeral", "remove per-runner dirs of runners that no longer exist: root:prefix1,prefix2[:minAgeMinutes] (repeatable)")
+	flag.Var(&c.tmpClean, "tmp-clean", "clean old CI leftovers from a shared temp dir: root:prefix1,prefix2,...[:minAgeMinutes[:owner]] (default age 180; root must be /tmp, /var/tmp or >=4 segments; skips anything open or in use; repeatable)")
+	flag.BoolVar(&c.noJobSwap, "no-job-swap", false, "systemd backend: forbid swap for jobs (MemorySwapMax=0)")
 	flag.DurationVar(&c.janitorEvery, "janitor-interval", 10*time.Minute, "how often the cache janitor runs (it also runs sooner when the disk is low)")
 	flag.BoolVar(&c.janitorDry, "janitor-dry-run", false, "report what the janitor would delete without deleting anything")
 	flag.StringVar(&c.dashUser, "dash-user", os.Getenv("RUNLIGHT_DASH_USER"), "user of the dashboard login screen; the password hash comes from env RUNLIGHT_DASH_PASSWORD_HASH. Empty = no login (keep it behind a proxy)")
@@ -279,7 +283,7 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 	})
 
 	var jan *janitor.Janitor
-	if len(c.caches)+len(c.ephemerals) > 0 {
+	if len(c.caches)+len(c.ephemerals)+len(c.tmpClean) > 0 {
 		jan = &janitor.Janitor{
 			Interval: c.janitorEvery, DryRun: c.janitorDry, Tel: hub, Log: log,
 			Live: func() ([]string, int) { _, busy := sc.Count(); return sc.Names(), busy },
@@ -306,8 +310,15 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 			}
 			jan.Ephemerals = append(jan.Ephemerals, e)
 		}
+		for _, spec := range c.tmpClean {
+			r, err := janitor.ParseTmp(spec)
+			if err != nil {
+				return fmt.Errorf("--tmp-clean %q: %w", spec, err)
+			}
+			jan.Tmps = append(jan.Tmps, r)
+		}
 		go jan.Run(ctx)
-		log.Info("cache janitor enabled", "rules", len(jan.Rules), "ephemeral", len(jan.Ephemerals), "dry_run", c.janitorDry)
+		log.Info("cache janitor enabled", "rules", len(jan.Rules), "ephemeral", len(jan.Ephemerals), "tmp_clean", len(jan.Tmps), "dry_run", c.janitorDry)
 	}
 	defer sc.Shutdown(context.WithoutCancel(ctx))
 

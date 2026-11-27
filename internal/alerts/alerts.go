@@ -35,6 +35,7 @@ type RuleID string
 const (
 	DiskLow       RuleID = "disk_low"
 	SwapFull      RuleID = "swap_full"
+	TmpRAM        RuleID = "tmp_ram"
 	MemLow        RuleID = "mem_low"
 	QueueStuck    RuleID = "queue_stuck"
 	JobFailures   RuleID = "job_failures"
@@ -61,6 +62,8 @@ type Inputs struct {
 	Now                                               time.Time
 	DiskFreeMB, DiskTotalMB, MemAvailMB, MemReserveMB uint64
 	SwapUsedMB, SwapTotalMB                           uint64
+	SwapInKBs, SwapOutKBs                             float64
+	TmpfsUsedMB, TmpfsTotalMB                         uint64
 	Runners, Busy, Limit                              int
 	GovernorReason                                    string
 	QueueDepth, QueueOldestWaitSec                    int

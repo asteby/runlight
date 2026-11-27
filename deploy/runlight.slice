@@ -7,5 +7,7 @@ CPUWeight=20
 IOWeight=20
 # Hard fences so a runaway build can never push mailcow/postgres into the OOM killer.
 MemoryHigh=6G
+# Para que los jobs no llenen el swap: --no-job-swap en el daemon (backend systemd) pone MemorySwapMax=0
+# en cada unidad. Opcionalmente, aquí: MemorySwapMax=0 para toda la slice.
 MemoryMax=8G
 TasksMax=4096

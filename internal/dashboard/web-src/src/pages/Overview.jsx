@@ -114,6 +114,13 @@ function Banners({ state }) {
           <a href="#/config">Reanudar</a>
         </div>
       )}
+      {state.memory && state.memory.verdict === 'active' && (
+        <div className="banner warn quiet" role="status">
+          <Icon name="triangle-alert" size={18} />
+          <span><b>Memoria.</b> {state.memory.note || 'El servidor está paginando.'}</span>
+          <a href="#/servidor">Ver memoria</a>
+        </div>
+      )}
       {a && a.active > 0 && (
         <div className={'banner ' + (a.critical > 0 ? 'crit' : 'warn')} role="status">
           <Icon name={a.critical > 0 ? 'octagon-alert' : 'bell-ring'} size={20} />

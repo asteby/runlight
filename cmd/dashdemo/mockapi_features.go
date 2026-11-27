@@ -55,7 +55,8 @@ type mockRule struct {
 
 var mockRules = []mockRule{
 	{"disk_low", "Disco casi lleno", "Avisa cuando el espacio libre baja del umbral y se mantiene un minuto.", "critical", "%", "Disco libre mínimo", 3, 50, 1, 12},
-	{"swap_full", "Swap llena", "El swap lleva diez minutos casi agotado: el servidor está paginando en exceso.", "warning", "%", "Swap usado desde", 50, 100, 1, 95},
+	{"swap_full", "Servidor paginando a swap", "Avisa cuando el swap está casi lleno y el servidor está paginando de verdad (o casi sin memoria). Un swap lleno pero quieto no avisa.", "warning", "%", "Swap usado desde", 50, 100, 1, 95},
+	{"tmp_ram", "/tmp ocupa mucha RAM", "Avisa cuando /tmp vive en RAM (tmpfs) y guarda más archivos temporales que el umbral: acaban en swap.", "warning", "GB", "Avisar si /tmp en RAM supera", 1, 64, 0.5, 4},
 	{"mem_low", "Memoria baja", "La memoria disponible cayó por debajo de la reserva multiplicada por el factor.", "warning", "× reserva", "Factor sobre la reserva", 1, 4, 0.1, 1.5},
 	{"queue_stuck", "Cola atascada", "Hay jobs esperando runner durante demasiado tiempo.", "warning", "min", "Espera máxima", 2, 240, 1, 15},
 	{"job_failures", "Fallos repetidos", "Varios jobs fallan seguidos en el mismo repositorio (30 min).", "warning", "fallos", "Fallos para avisar", 2, 20, 1, 3},

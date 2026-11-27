@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -66,5 +67,66 @@ func TestRunArgsOptionalLimitsOmitted(t *testing.T) {
 		if strings.Contains(joined, bad) {
 			t.Errorf("unexpected %q: %s", bad, joined)
 		}
+	}
+}
+
+func TestRunArgsTmpdirPerJob(t *testing.T) {
+	s := NewSystemd("/tpl", "/jobs", "ubuntu", slog.New(slog.DiscardHandler))
+	args := s.runArgs(Spec{Name: "runlight-x"}, "/jobs/runlight-x")
+	want := "--setenv=TMPDIR=" + filepath.Join("/jobs/runlight-x", "tmp")
+	n := 0
+	for _, a := range args {
+		if a == want {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("want exactly one %q in %v", want, args)
+	}
+}
+
+func TestRunArgsEnvTmpdirWins(t *testing.T) {
+	s := NewSystemd("/tpl", "/jobs", "ubuntu", slog.New(slog.DiscardHandler))
+	s.Env = []string{"PATH=/bin", "TMPDIR=/mnt/big"}
+	joined := strings.Join(s.runArgs(Spec{Name: "r"}, "/jobs/r"), " ")
+	if !strings.Contains(joined, "--setenv=TMPDIR=/mnt/big") {
+		t.Fatalf("Env TMPDIR missing: %s", joined)
+	}
+	if strings.Count(joined, "TMPDIR=") != 1 {
+		t.Fatalf("TMPDIR must appear once: %s", joined)
+	}
+}
+
+func TestRunArgsNoSwap(t *testing.T) {
+	s := NewSystemd("/tpl", "/jobs", "ubuntu", slog.New(slog.DiscardHandler))
+	if strings.Contains(strings.Join(s.runArgs(Spec{Name: "r"}, "/jobs/r"), " "), "MemorySwapMax") {
+		t.Fatal("MemorySwapMax must be absent by default")
+	}
+	s.NoSwap = true
+	args := s.runArgs(Spec{Name: "r"}, "/jobs/r")
+	ok := false
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "-p" && args[i+1] == "MemorySwapMax=0" {
+			ok = true
+		}
+	}
+	if !ok {
+		t.Fatalf("missing -p MemorySwapMax=0: %v", args)
+	}
+}
+
+func TestMakeJobTmpCreates0700(t *testing.T) {
+	jobDir := t.TempDir()
+	s := NewSystemd("/tpl", filepath.Dir(jobDir), "nonexistent-user-xyz", slog.New(slog.DiscardHandler))
+	s.Elevate = []string{"true"}
+	if err := s.makeJobTmp(context.Background(), jobDir); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Stat(filepath.Join(jobDir, "tmp"))
+	if err != nil || !fi.IsDir() {
+		t.Fatalf("tmp not created: %v", err)
+	}
+	if runtime.GOOS != "windows" && fi.Mode().Perm() != 0o700 {
+		t.Fatalf("perm = %v, want 0700", fi.Mode().Perm())
 	}
 }

@@ -16,6 +16,24 @@ import (
 	"github.com/dannyjp49/runlight/internal/telemetry"
 )
 
+// demoMemoryInfo is the real VPS case: swap 6/6 GB full but idle (no paging), /tmp a
+// 12 GB tmpfs holding 6.2 GB of CI leftovers. Built through the same verdict
+// code the daemon uses.
+func demoMemoryInfo(sig governor.Signals) telemetry.MemoryInfo {
+	return telemetry.BuildMemory(sig.SwapUsedMB, sig.SwapTotalMB, sig.SwapInKBs, sig.SwapOutKBs, sig.MemSome,
+		[]telemetry.TmpfsInfo{
+			{Path: "/tmp", UsedMB: sig.TmpfsUsedMB, TotalMB: sig.TmpfsTotalMB},
+			{Path: "/dev/shm", UsedMB: 12, TotalMB: 11731},
+		},
+		[]telemetry.SwapProc{
+			{PID: 1423, Name: "mariadbd", MB: 2310, Unit: "mariadb"},
+			{PID: 2210, Name: "tienda-main", MB: 1480, Unit: "tienda-main"},
+			{PID: 3871, Name: "node", MB: 940, Unit: "pm2-ubuntu"},
+			{PID: 912, Name: "snapd", MB: 210, Unit: "snapd"},
+			{PID: 1, Name: "systemd", MB: 64, Unit: "init"},
+		})
+}
+
 func main() {
 	addr := flag.String("listen", "127.0.0.1:9128", "address")
 	user := flag.String("user", "", "enable the login screen with this user")
@@ -62,6 +80,7 @@ func main() {
 			HasPSI: true, CPUSome: prodCPU, MemSome: 0.2, IOSome: 0.4,
 			HostCPUSome: math.Min(95, prodCPU+45+8*math.Sin(sec/25)),
 			MemTotalMB:  23463, MemAvailMB: uint64(11500 + 1500*math.Sin(sec/90)), SwapTotalMB: 6144, SwapUsedMB: 6144,
+			TmpfsUsedMB: 6350, TmpfsTotalMB: 12288,
 			DiskFreeMB: 55000, DiskTotalMB: 197000, LoadPerCore: 0.9,
 		}
 		limit := gov.Update(now, sig, runners)
@@ -69,6 +88,7 @@ func main() {
 		busy = max(0, runners-int(sec/50)%2)
 		dec := gov.Decision()
 		hub.SetDecision(dec)
+		hub.SetMemory(demoMemoryInfo(sig))
 		if limit != lastLimit && lastLimit >= 0 {
 			hub.Eventf("capacity", "Capacidad %d → %d: %s.", lastLimit, limit, string(dec.Reason))
 		}

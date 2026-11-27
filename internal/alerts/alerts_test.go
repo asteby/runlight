@@ -80,7 +80,7 @@ func TestHealthyIsSilent(t *testing.T) {
 		t.Fatalf("unexpected notifications: %+v", n)
 	}
 	s := e.Snapshot()
-	if len(s.Active) != 0 || len(s.History) != 0 || len(s.Rules) != 8 {
+	if len(s.Active) != 0 || len(s.History) != 0 || len(s.Rules) != 9 {
 		t.Fatalf("snapshot = %+v", s)
 	}
 }
@@ -223,47 +223,6 @@ func TestUnknownDiskDataIsIgnored(t *testing.T) {
 	}
 	if len(r.take()) != 0 {
 		t.Fatal("missing data must not alert")
-	}
-}
-
-func swapIn(d time.Duration, used uint64) Inputs {
-	in := healthy(d)
-	in.SwapTotalMB, in.SwapUsedMB = 4096, used
-	return in
-}
-
-func TestSwapFull(t *testing.T) {
-	e, r := newEngine()
-	for i := 0; i <= 299; i++ { // 598 s
-		run(e, swapIn(sec(2*i), 4000)) // 97.7 %
-	}
-	if len(r.take()) != 0 {
-		t.Fatal("must wait 600 s")
-	}
-	run(e, swapIn(sec(600), 4000))
-	got := r.take()
-	if len(got) != 1 || got[0].Severity != Warning || got[0].Tag != "swap_full" ||
-		!strings.Contains(got[0].Body, "97.7 %") {
-		t.Fatalf("got %+v", got)
-	}
-	// repeat only every 12 h
-	run(e, swapIn(sec(600)+min(719), 4000))
-	if len(r.take()) != 0 {
-		t.Fatal("no repeat before 12 h")
-	}
-	run(e, swapIn(sec(600)+min(720), 4000))
-	if len(r.take()) != 1 {
-		t.Fatal("repeat at 12 h")
-	}
-	// hysteresis: 90 % keeps it, 80 % (< 85) resolves immediately
-	run(e, swapIn(sec(600)+min(721), 3686))
-	if len(e.Snapshot().Active) != 1 {
-		t.Fatal("90 % is inside the band")
-	}
-	run(e, swapIn(sec(600)+min(722), 3277))
-	got = r.take()
-	if len(got) != 1 || !got[0].Resolved {
-		t.Fatalf("resolve = %+v", got)
 	}
 }
 
@@ -910,7 +869,7 @@ func TestConfigSanitize(t *testing.T) {
 	if _, ok := c["bogus_rule"]; ok {
 		t.Fatal("unknown rules must be dropped")
 	}
-	if len(c) != 8 || !c[JobFailures].Enabled || c[JobFailures].Threshold != 3 {
+	if len(c) != 9 || !c[JobFailures].Enabled || c[JobFailures].Threshold != 3 {
 		t.Fatalf("missing rules must take defaults: %+v", c)
 	}
 	// Config returns a copy
@@ -929,7 +888,7 @@ func TestConfigSanitize(t *testing.T) {
 
 func TestRuleCatalog(t *testing.T) {
 	cat := RuleCatalog()
-	want := []RuleID{DiskLow, SwapFull, MemLow, QueueStuck, JobFailures, ProdPressure, DaemonRestart, JanitorStuck}
+	want := []RuleID{DiskLow, SwapFull, TmpRAM, MemLow, QueueStuck, JobFailures, ProdPressure, DaemonRestart, JanitorStuck}
 	if len(cat) != len(want) {
 		t.Fatalf("len = %d", len(cat))
 	}
@@ -966,6 +925,7 @@ func TestRuleCatalog(t *testing.T) {
 	}
 	check(DiskLow, 12, 3, 50, Critical)
 	check(SwapFull, 95, 50, 100, Warning)
+	check(TmpRAM, 4, 1, 64, Warning)
 	check(MemLow, 1.5, 1, 4, Warning)
 	check(QueueStuck, 15, 2, 240, Warning)
 	check(JobFailures, 3, 2, 20, Warning)

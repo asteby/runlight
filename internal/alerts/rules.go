@@ -56,13 +56,23 @@ var specs = []ruleSpec{
 	},
 	{
 		id: SwapFull, sev: Warning,
-		title: "Swap casi lleno",
-		desc:  "Avisa cuando el swap lleva mucho tiempo casi lleno: la memoria está al límite y todo irá más lento.",
+		title: "Servidor paginando a swap",
+		desc:  "Avisa cuando el swap está casi lleno Y el servidor está paginando de verdad (o casi sin memoria). Un swap lleno pero quieto no avisa: son páginas viejas sin impacto.",
 		unit:  "% usado",
-		label: "Avisar si el swap supera",
+		label: "Avisar si el swap supera (y hay actividad)",
 		def:   95, min: 50, max: 100, step: 1,
-		forDur: 600 * time.Second, repeat: 12 * time.Hour,
+		forDur: 120 * time.Second, repeat: 12 * time.Hour,
 		eval: evalSwapFull,
+	},
+	{
+		id: TmpRAM, sev: Warning,
+		title: "/tmp ocupa mucha RAM",
+		desc:  "Avisa cuando /tmp es un tmpfs (vive en RAM) y guarda más archivos temporales que el umbral: acaban en swap.",
+		unit:  "GB",
+		label: "Avisar si /tmp en RAM supera",
+		def:   4, min: 1, max: 64, step: 0.5,
+		forDur: 300 * time.Second, repeat: 6 * time.Hour,
+		eval: evalTmpRAM,
 	},
 	{
 		id: MemLow, sev: Warning,
@@ -208,19 +218,59 @@ func evalDiskLow(e *Engine, th float64, in Inputs) []check {
 	}}
 }
 
+// swapActiveKBs is the sustained swap traffic (in+out) that counts as paging.
+const swapActiveKBs = 512.0
+
 func evalSwapFull(e *Engine, th float64, in Inputs) []check {
 	if in.SwapTotalMB == 0 {
 		return []check{{key: string(SwapFull), unknown: true}}
 	}
 	p := float64(in.SwapUsedMB) / float64(in.SwapTotalMB) * 100
+	act := in.SwapInKBs + in.SwapOutKBs
+	memLimit := float64(in.MemReserveMB) * 1.5
+	lowMem := in.MemReserveMB > 0 && float64(in.MemAvailMB) < memLimit
+	paging := act >= swapActiveKBs
+	// Resolve when the swap drained, or when it is no longer being used and
+	// memory recovered (half the trigger traffic, 20 % above the memory line).
+	calm := act < swapActiveKBs/2 && (in.MemReserveMB == 0 || float64(in.MemAvailMB) >= memLimit*1.2)
+	var why string
+	switch {
+	case paging && lowMem:
+		why = fmt.Sprintf("Está paginando: entran %.0f KB/s y salen %.0f KB/s, y quedan solo %s de memoria disponible.",
+			in.SwapInKBs, in.SwapOutKBs, fmtGB(in.MemAvailMB))
+	case paging:
+		why = fmt.Sprintf("Está paginando: entran %.0f KB/s y salen %.0f KB/s.", in.SwapInKBs, in.SwapOutKBs)
+	default:
+		why = fmt.Sprintf("Queda poca memoria disponible (%s) y el swap está casi lleno.", fmtGB(in.MemAvailMB))
+	}
 	return []check{{
 		key:   string(SwapFull),
-		title: "Swap casi lleno",
-		fire:  p >= th,
-		clear: p < th-10,
-		body: fmt.Sprintf("El swap está al %s (%s de %s) y quedan %s de memoria disponible. El servidor está al límite de memoria.",
-			fmtPct(p), fmtGB(in.SwapUsedMB), fmtGB(in.SwapTotalMB), fmtGB(in.MemAvailMB)),
-		okBody: fmt.Sprintf("El swap bajó al %s (%s de %s).", fmtPct(p), fmtGB(in.SwapUsedMB), fmtGB(in.SwapTotalMB)),
+		title: "Servidor paginando a swap",
+		fire:  p >= th && (paging || lowMem),
+		clear: p < th-10 || calm,
+		body:  fmt.Sprintf("El swap está al %s (%s de %s). %s", fmtPct(p), fmtGB(in.SwapUsedMB), fmtGB(in.SwapTotalMB), why),
+		okBody: fmt.Sprintf("El swap dejó de ser un problema: %s (%s de %s) y ya no pagina.",
+			fmtPct(p), fmtGB(in.SwapUsedMB), fmtGB(in.SwapTotalMB)),
+	}}
+}
+
+func evalTmpRAM(e *Engine, th float64, in Inputs) []check {
+	usedGB := float64(in.TmpfsUsedMB) / 1024
+	// TmpfsTotalMB == 0 means /tmp is not a tmpfs: nothing in RAM, so it
+	// never fires and any active alert resolves.
+	on := in.TmpfsTotalMB > 0
+	pct := 0.0
+	if on {
+		pct = float64(in.TmpfsUsedMB) / float64(in.TmpfsTotalMB) * 100
+	}
+	return []check{{
+		key:   string(TmpRAM),
+		title: "/tmp ocupa mucha RAM",
+		fire:  on && usedGB >= th,
+		clear: !on || usedGB < th*0.8,
+		body: fmt.Sprintf("/tmp ocupa %s de RAM (%s de su límite). Los archivos temporales viejos acaban en swap. Activa la limpieza de /tmp o usa TMPDIR en disco.",
+			fmtGB(in.TmpfsUsedMB), fmtPct(pct)),
+		okBody: fmt.Sprintf("/tmp bajó a %s de RAM.", fmtGB(in.TmpfsUsedMB)),
 	}}
 }
 

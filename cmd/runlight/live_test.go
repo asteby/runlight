@@ -115,3 +115,14 @@ func TestAlertInputsFromTelemetry(t *testing.T) {
 }
 
 func discardLogger() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
+
+func TestAlertInputsCarrySwapAndTmpfs(t *testing.T) {
+	hub := telemetry.New(telemetry.Config{})
+	gov := governor.New(governor.Params{Max: 2})
+	lv := &live{}
+	sig := governor.Signals{SwapUsedMB: 6144, SwapTotalMB: 6144, SwapInKBs: 10, SwapOutKBs: 20, TmpfsUsedMB: 6350, TmpfsTotalMB: 12288}
+	in := alertInputs(time.Now(), sig, hub, gov, lv, 0, 0, 1, false)
+	if in.SwapInKBs != 10 || in.SwapOutKBs != 20 || in.TmpfsUsedMB != 6350 || in.TmpfsTotalMB != 12288 {
+		t.Fatalf("inputs = %+v", in)
+	}
+}

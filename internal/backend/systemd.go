@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -30,8 +31,11 @@ type Systemd struct {
 	// ["sudo","-n"]. Empty when the daemon already runs as root.
 	Elevate    []string
 	RuntimeMax time.Duration
-	Log        *slog.Logger
-	exited     chan string
+	// NoSwap forbids jobs from using swap (MemorySwapMax=0): their cold pages
+	// are reclaimed or the job is OOM-killed instead of filling the swap.
+	NoSwap bool
+	Log    *slog.Logger
+	exited chan string
 }
 
 func NewSystemd(template, jobsDir, runAs string, log *slog.Logger) *Systemd {
@@ -68,8 +72,20 @@ func (s *Systemd) runArgs(sp Spec, jobDir string) []string {
 	if s.RuntimeMax > 0 {
 		a = append(a, "-p", fmt.Sprintf("RuntimeMaxSec=%d", int(s.RuntimeMax.Seconds())))
 	}
+	if s.NoSwap {
+		a = append(a, "-p", "MemorySwapMax=0")
+	}
+	hasTmp := false
 	for _, e := range s.Env {
 		a = append(a, "--setenv="+e)
+		if strings.HasPrefix(e, "TMPDIR=") {
+			hasTmp = true
+		}
+	}
+	// Per-job TMPDIR on disk (inside the job dir, deleted with it) unless Env
+	// already sets one: the explicit Env value wins.
+	if !hasTmp {
+		a = append(a, "--setenv=TMPDIR="+jobTmp(jobDir))
 	}
 	// The JIT credential travels via a 0600 file consumed (and removed) by the
 	// wrapper, so it never shows up in argv, `ps` or `systemctl show`.
@@ -79,6 +95,45 @@ func (s *Systemd) runArgs(sp Spec, jobDir string) []string {
 }
 
 func name2unit(n string) string { return n }
+
+// jobTmp is the per-job TMPDIR.
+func jobTmp(jobDir string) string { return filepath.Join(jobDir, "tmp") }
+
+// makeJobTmp creates the job's TMPDIR (0700) owned by RunAs. When the daemon
+// is not root and cannot chown, it falls back to the elevation prefix.
+func (s *Systemd) makeJobTmp(ctx context.Context, jobDir string) error {
+	dir := jobTmp(jobDir)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	// The job dir is a hard-linked copy of the template: never chmod/chown
+	// through a symlink that could have come along with it.
+	if fi, err := os.Lstat(dir); err != nil || !fi.IsDir() || fi.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("job tmp %s is not a plain directory", dir)
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		return err
+	}
+	u, err := user.Lookup(s.RunAs)
+	if err != nil {
+		return nil
+	}
+	uid, e1 := strconv.Atoi(u.Uid)
+	gid, e2 := strconv.Atoi(u.Gid)
+	if e1 != nil || e2 != nil {
+		return nil // not a unix account (non-Linux dev machine)
+	}
+	if os.Lchown(dir, uid, gid) == nil {
+		return nil
+	}
+	if len(s.Elevate) > 0 {
+		args := append(append([]string{}, s.Elevate...), "chown", u.Uid+":"+u.Gid, dir)
+		if out, err := exec.CommandContext(ctx, args[0], args[1:]...).CombinedOutput(); err != nil {
+			return fmt.Errorf("chown job tmp: %w: %s", err, strings.TrimSpace(string(out)))
+		}
+	}
+	return nil
+}
 
 func (s *Systemd) Start(ctx context.Context, sp Spec) error {
 	jobDir := filepath.Join(s.JobsDir, sp.Name)
@@ -92,6 +147,10 @@ func (s *Systemd) Start(ctx context.Context, sp Spec) error {
 	if err := os.WriteFile(filepath.Join(jobDir, ".jit"), []byte(sp.JITConfig), 0o600); err != nil {
 		os.RemoveAll(jobDir)
 		return err
+	}
+	if err := s.makeJobTmp(ctx, jobDir); err != nil {
+		os.RemoveAll(jobDir)
+		return fmt.Errorf("job tmp: %w", err)
 	}
 	args := append(append([]string{}, s.Elevate...), s.runArgs(sp, jobDir)...)
 	cmd := exec.Command(args[0], args[1:]...)

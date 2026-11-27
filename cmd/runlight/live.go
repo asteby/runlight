@@ -301,6 +301,8 @@ func alertInputs(now time.Time, sig governor.Signals, hub *telemetry.Hub, gov *g
 		DiskFreeMB: sig.DiskFreeMB, DiskTotalMB: sig.DiskTotalMB,
 		MemAvailMB: sig.MemAvailMB, MemReserveMB: lv.memReserveMB.Load(),
 		SwapUsedMB: sig.SwapUsedMB, SwapTotalMB: sig.SwapTotalMB,
+		SwapInKBs: sig.SwapInKBs, SwapOutKBs: sig.SwapOutKBs,
+		TmpfsUsedMB: sig.TmpfsUsedMB, TmpfsTotalMB: sig.TmpfsTotalMB,
 		Runners: total, Busy: busy, Limit: limit,
 		GovernorReason: string(gov.Reason()),
 		QueueDepth:     hub.QueueDepth(), QueueOldestWaitSec: hub.QueueOldestWaitSec(now),

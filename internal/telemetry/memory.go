@@ -1,0 +1,88 @@
+package telemetry
+
+import "fmt"
+
+// TmpfsInfo is a RAM-backed filesystem (/tmp, /dev/shm).
+type TmpfsInfo struct {
+	Path    string `json:"path"`
+	UsedMB  uint64 `json:"usedMb"`
+	TotalMB uint64 `json:"totalMb"`
+}
+
+// SwapProc is a process holding swapped-out pages. Unit is a readable
+// cgroup/service name, "" when unknown.
+type SwapProc struct {
+	PID  int    `json:"pid"`
+	Name string `json:"name"`
+	MB   uint64 `json:"mb"`
+	Unit string `json:"unit"`
+}
+
+// MemoryInfo explains swap and RAM-backed temp files: how full is swap, is the
+// server actually paging, and who is holding it.
+type MemoryInfo struct {
+	SwapUsedMB  uint64      `json:"swapUsedMb"`
+	SwapTotalMB uint64      `json:"swapTotalMb"`
+	SwapInKBs   float64     `json:"swapInKbs"`
+	SwapOutKBs  float64     `json:"swapOutKbs"`
+	Tmpfs       []TmpfsInfo `json:"tmpfs"`
+	TopSwap     []SwapProc  `json:"topSwap"` // at most MaxTopSwap, biggest first
+	Verdict     string      `json:"verdict"` // "none" | "idle" | "active"
+	Note        string      `json:"note"`
+}
+
+const (
+	// MaxTopSwap caps the "who uses swap" list.
+	MaxTopSwap = 8
+	// ActiveSwapKBs is the swap traffic (in+out) from which the server counts
+	// as paging.
+	ActiveSwapKBs = 64.0
+	// activePSIMem is the production memory stall (%) from which it counts as paging.
+	activePSIMem = 1.0
+	// tmpNoteMB is the /tmp size from which the idle note mentions it.
+	tmpNoteMB = 1024
+)
+
+// BuildMemory assembles the memory section and its verdict. psiMem is the
+// production-scope memory pressure (some avg10, percent).
+//
+//	none:   nothing in swap
+//	idle:   swap used but (in+out) < 64 KB/s and psiMem < 1 %: stale pages
+//	active: otherwise, the server is paging
+func BuildMemory(swapUsedMB, swapTotalMB uint64, inKBs, outKBs, psiMem float64, tmpfs []TmpfsInfo, top []SwapProc) MemoryInfo {
+	m := MemoryInfo{
+		SwapUsedMB: swapUsedMB, SwapTotalMB: swapTotalMB, SwapInKBs: inKBs, SwapOutKBs: outKBs,
+		Tmpfs:   append([]TmpfsInfo{}, tmpfs...),
+		TopSwap: append([]SwapProc{}, top...),
+	}
+	if len(m.TopSwap) > MaxTopSwap {
+		m.TopSwap = m.TopSwap[:MaxTopSwap]
+	}
+	switch {
+	case swapUsedMB == 0:
+		m.Verdict = "none"
+		m.Note = "No hay nada en el swap."
+	case inKBs+outKBs < ActiveSwapKBs && psiMem < activePSIMem:
+		m.Verdict = "idle"
+		m.Note = "Swap ocupado pero inactivo: son páginas viejas que nadie usa; no hay impacto."
+		for _, t := range m.Tmpfs {
+			if t.Path == "/tmp" && t.UsedMB > tmpNoteMB {
+				m.Note += fmt.Sprintf(" /tmp (en RAM) guarda %.1f GB de archivos temporales.", float64(t.UsedMB)/1024)
+			}
+		}
+	default:
+		m.Verdict = "active"
+		m.Note = fmt.Sprintf("El servidor está paginando: entran %.0f KB/s y salen %.0f KB/s.", inKBs, outKBs)
+	}
+	return m
+}
+
+// SetMemory stores the latest memory section for the dashboard.
+func (h *Hub) SetMemory(m MemoryInfo) {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	h.memory = m
+	h.mu.Unlock()
+}

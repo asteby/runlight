@@ -26,6 +26,14 @@ ExecStart=/usr/local/bin/runlight \
 # El directorio debe poder escribirlo el usuario del servicio: o bien añadir
 # StateDirectory=runlight (systemd lo crea con el dueño correcto) o bien
 #   sudo install -d -o ubuntu -g ubuntu -m 0700 /var/lib/runlight
+# Swap y /tmp (fase 9). El swap lleno con 0 actividad es inofensivo; la causa real es que /tmp es
+# tmpfs (RAM) y acumula basura de CI. Flags opcionales para ExecStart (valores recomendados en el VPS):
+#   --tmp-clean /tmp:go-link-,ops-seed-bin,wasm-imports-,link-release-build,gt-vps-,node-compile-cache,.pnpm-store:180:ubuntu
+#       (repetible; root:prefijos[:minutos[:dueño]]; root solo /tmp, /var/tmp o >=4 segmentos; solo primer nivel;
+#        no sigue symlinks; omite lo abierto o usado como cwd por algún proceso; respeta --janitor-dry-run)
+#   --no-job-swap
+#       (backend systemd: los jobs no pueden usar swap, MemorySwapMax=0; por defecto desactivado)
+# Con el backend systemd cada job recibe además TMPDIR=<jobs-dir>/<runner>/tmp en disco (se borra con el job).
 Restart=always
 RestartSec=5
 # Runners are separate containers: restarting the daemon does not kill jobs.

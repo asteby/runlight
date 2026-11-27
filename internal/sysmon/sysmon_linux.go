@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/dannyjp49/runlight/internal/governor"
 )
@@ -75,6 +76,10 @@ func (l Linux) Sample() (governor.Signals, error) {
 		s.DiskFreeMB = st.Bavail * bs / (1 << 20)
 		s.DiskTotalMB = st.Blocks * bs / (1 << 20)
 	}
+	// /tmp as RAM and swap traffic (the daemon uses them to tell "swap full"
+	// from "server paging").
+	s.TmpfsUsedMB, s.TmpfsTotalMB, _ = Tmpfs("/tmp")
+	s.SwapInKBs, s.SwapOutKBs = sampleSwapRates(time.Now())
 	return s, nil
 }
 
