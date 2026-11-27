@@ -284,11 +284,11 @@ func (j *Janitor) runTmp(rules []TmpRule, now time.Time, low bool) (removed []st
 		removed = append(removed, rm...)
 		freed += fr
 		if len(rm) > 0 {
-			verb := "eliminó"
+			verb, freedVerb := "eliminó", "liberó"
 			if j.DryRun {
-				verb = "eliminaría"
+				verb, freedVerb = "eliminaría", "liberaría"
 			}
-			j.Tel.Eventf("prune", "Limpieza de temporales en %s: %s %d elemento(s) de CI y liberó %s.", r.Root, verb, len(rm), human(fr))
+			j.Tel.Eventf("prune", "Limpieza de temporales en %s: %s %d elemento(s) de CI y %s %s.", r.Root, verb, len(rm), freedVerb, human(fr))
 		}
 	}
 	return removed, freed

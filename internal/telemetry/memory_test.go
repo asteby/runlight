@@ -40,16 +40,20 @@ func TestVerdictIdleSmallTmpNoMention(t *testing.T) {
 }
 
 func TestVerdictActive(t *testing.T) {
-	m := BuildMemory(6144, 6144, 100, 50, 0, tmp62, nil) // 150 KB/s
-	if m.Verdict != "active" || m.Note != "El servidor está paginando: entran 100 KB/s y salen 50 KB/s." {
+	m := BuildMemory(6144, 6144, 300, 150, 0, tmp62, nil) // 450 KB/s
+	if m.Verdict != "active" || m.Note != "El servidor está paginando: entran 300 KB/s y salen 150 KB/s." {
 		t.Fatalf("%+v", m)
 	}
-	// Boundary: 64 KB/s total is already active; 63 is idle.
-	if BuildMemory(1, 2, 32, 32, 0, nil, nil).Verdict != "active" {
-		t.Fatal("64 KB/s must be active")
+	// Boundary: 256 KB/s total is already active; 255 is idle.
+	if BuildMemory(1, 2, 128, 128, 0, nil, nil).Verdict != "active" {
+		t.Fatal("256 KB/s must be active")
 	}
-	if BuildMemory(1, 2, 32, 31, 0, nil, nil).Verdict != "idle" {
-		t.Fatal("63 KB/s must be idle")
+	if BuildMemory(1, 2, 128, 127, 0, nil, nil).Verdict != "idle" {
+		t.Fatal("255 KB/s must be idle")
+	}
+	// The case that used to flicker: 342 KB/s of background swap-in is not paging once it is smoothed away.
+	if BuildMemory(1, 2, 100, 0, 0, nil, nil).Verdict != "idle" {
+		t.Fatal("100 KB/s must be idle")
 	}
 	// A memory stall alone makes it active.
 	if BuildMemory(1, 2, 0, 0, 1.0, nil, nil).Verdict != "active" {
@@ -90,4 +94,23 @@ func TestHubServesMemory(t *testing.T) {
 	}
 	var nilHub *Hub
 	nilHub.SetMemory(MemoryInfo{}) // must not panic
+}
+
+func TestVerdictHysteresis(t *testing.T) {
+	// Already active: stays active between the exit and the enter threshold...
+	if BuildMemoryHyst(1, 2, 150, 0, 0, nil, nil, true).Verdict != "active" {
+		t.Fatal("150 KB/s must stay active once active")
+	}
+	// ...but a fresh verdict at the same value is idle: no flapping around the line.
+	if BuildMemoryHyst(1, 2, 150, 0, 0, nil, nil, false).Verdict != "idle" {
+		t.Fatal("150 KB/s must not trigger from idle")
+	}
+	// Clears below the exit bound.
+	if BuildMemoryHyst(1, 2, 100, 20, 0.2, nil, nil, true).Verdict != "idle" {
+		t.Fatal("120 KB/s and PSI 0.2 must clear")
+	}
+	// A memory stall keeps it active down to 0.5 %.
+	if BuildMemoryHyst(1, 2, 0, 0, 0.6, nil, nil, true).Verdict != "active" {
+		t.Fatal("PSI 0.6 must stay active")
+	}
 }

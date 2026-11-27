@@ -149,3 +149,25 @@ func TestMemoryInfoActiveAndShm(t *testing.T) {
 		t.Fatal("PSI mem 3 % must be active")
 	}
 }
+
+func TestSwapSmoothingIgnoresShortBursts(t *testing.T) {
+	c := newCollector(nil, "system.slice", "runlight.slice", 1024, 8192)
+	t0 := time.Unix(1_000_000, 0)
+	for i := 0; i < 15; i++ { // 30 s of quiet
+		c.smoothSwap(t0.Add(time.Duration(i)*2*time.Second), 0, 0)
+	}
+	// One 2 s burst at 342 KB/s (what used to flip the notice) must not reach the 256 KB/s bar.
+	in, out := c.smoothSwap(t0.Add(30*time.Second), 342, 0)
+	if in+out >= 256 {
+		t.Fatalf("a single burst leaked through the smoothing: %.0f KB/s", in+out)
+	}
+	// Sustained heavy paging does get through.
+	var sum float64
+	for i := 1; i <= 40; i++ { // 80 s at 600 KB/s
+		in, out = c.smoothSwap(t0.Add(30*time.Second+time.Duration(i)*2*time.Second), 600, 0)
+		sum = in + out
+	}
+	if sum < 256 {
+		t.Fatalf("sustained paging was smoothed away: %.0f KB/s", sum)
+	}
+}

@@ -51,7 +51,9 @@ function Kpis({ state }) {
           <span className="note-i crit"><Icon name="x" size={14} />{tot.failed}</span>{' '}
           <span className="note-i">cancelados {tot.canceled}</span>
         </>} />
-      <Tile label="Memoria disponible" value={gb(p.memAvailMb)} small={'de ' + gb(c.memTotalMb)} note="Compartida por todos" meter={c.memTotalMb ? (p.memAvailMb / c.memTotalMb) * 100 : null} kind="prod" />
+      <Tile label="Memoria disponible" value={gb(p.memAvailMb)} small={'de ' + gb(c.memTotalMb)} note={state.memory && state.memory.verdict === 'active'
+        ? <a className="note-warn" href="#/servidor" title={state.memory.note}><Icon name="triangle-alert" size={14} /> Paginando {Math.round(state.memory.swapInKbs + state.memory.swapOutKbs)} KB/s</a>
+        : 'Compartida por todos'} meter={c.memTotalMb ? (p.memAvailMb / c.memTotalMb) * 100 : null} kind="prod" />
     </section>
   );
 }
@@ -112,13 +114,6 @@ function Banners({ state }) {
           <Icon name="pause" size={20} />
           <span><b>Escalado en pausa.</b> No se arrancan runners nuevos; los que están vivos terminan su job.</span>
           <a href="#/config">Reanudar</a>
-        </div>
-      )}
-      {state.memory && state.memory.verdict === 'active' && (
-        <div className="banner warn quiet" role="status">
-          <Icon name="triangle-alert" size={18} />
-          <span><b>Memoria.</b> {state.memory.note || 'El servidor está paginando.'}</span>
-          <a href="#/servidor">Ver memoria</a>
         </div>
       )}
       {a && a.active > 0 && (

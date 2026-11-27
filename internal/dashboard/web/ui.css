@@ -328,3 +328,7 @@ td .repo { color: var(--ink2); }
   .spin { animation: none; }
   .meter i, .toggle .track, .toggle .thumb { transition: none; }
 }
+.tile .note-warn { display: inline-flex; align-items: center; gap: 4px; color: var(--warn-text); text-decoration: none; font-weight: 600; white-space: nowrap; }
+.tile .note-warn:hover { text-decoration: underline; }
+.tile .note-warn { line-height: inherit; vertical-align: top; }
+.tile .note-warn svg { flex: none; margin: -3px 0; }

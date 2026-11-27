@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -27,6 +28,11 @@ type collector struct {
 	lastTick time.Time
 	lastLim  int
 	lastNote string
+
+	// swap traffic smoothing and verdict hysteresis (see memoryInfo)
+	swapIn, swapOut float64
+	swapAt          time.Time
+	memActive       bool
 
 	// Swap section. The process scan walks /proc, so it runs at most every
 	// swapScanEvery, never on each tick.
@@ -200,5 +206,30 @@ func (c *collector) memoryInfo(now time.Time, s governor.Signals) telemetry.Memo
 	if s.HasPSI {
 		psi = s.MemSome
 	}
-	return telemetry.BuildMemory(s.SwapUsedMB, s.SwapTotalMB, s.SwapInKBs, s.SwapOutKBs, psi, tmp, c.topSwap)
+	// Smooth the swap traffic (time constant ~30 s) so a short burst of
+	// swap-ins cannot flip the verdict, then apply hysteresis.
+	in, out := c.smoothSwap(now, s.SwapInKBs, s.SwapOutKBs)
+	m := telemetry.BuildMemoryHyst(s.SwapUsedMB, s.SwapTotalMB, in, out, psi, tmp, c.topSwap, c.memActive)
+	c.memActive = m.Verdict == "active"
+	return m
+}
+
+// swapSmoothTau is the time constant of the swap traffic average.
+const swapSmoothTau = 30 * time.Second
+
+// smoothSwap is an exponential moving average of the swap-in/out rates.
+func (c *collector) smoothSwap(now time.Time, in, out float64) (float64, float64) {
+	if c.swapAt.IsZero() {
+		c.swapIn, c.swapOut, c.swapAt = in, out, now
+		return in, out
+	}
+	dt := now.Sub(c.swapAt)
+	c.swapAt = now
+	if dt <= 0 {
+		return c.swapIn, c.swapOut
+	}
+	a := 1 - math.Exp(-dt.Seconds()/swapSmoothTau.Seconds())
+	c.swapIn += a * (in - c.swapIn)
+	c.swapOut += a * (out - c.swapOut)
+	return c.swapIn, c.swapOut
 }

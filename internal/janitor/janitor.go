@@ -496,11 +496,11 @@ func (j *Janitor) Once(ctx context.Context) Report {
 		rep.Freed += freed
 		rep.Removed = append(rep.Removed, removed...)
 		if len(removed) > 0 {
-			verb := "eliminó"
+			verb, freedVerb := "eliminó", "liberó"
 			if j.DryRun {
-				verb = "eliminaría"
+				verb, freedVerb = "eliminaría", "liberaría"
 			}
-			j.Tel.Eventf("prune", "Limpieza de %s: %s %d carpeta(s) de runners que ya no existen y liberó %s.", e.Root, verb, len(removed), human(freed))
+			j.Tel.Eventf("prune", "Limpieza de %s: %s %d carpeta(s) de runners que ya no existen y %s %s.", e.Root, verb, len(removed), freedVerb, human(freed))
 		}
 	}
 
