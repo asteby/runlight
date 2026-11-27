@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.exe
+*.test
+*.out
+.env
+.env.*
+# Contrato interno de trabajo del enjambre de agentes; no es documentación del producto.
+docs/CONTRACT.md

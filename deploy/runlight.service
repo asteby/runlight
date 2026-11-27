@@ -1,0 +1,44 @@
+[Unit]
+Description=Runlight: PSI-aware autoscaler for GitHub Actions runners
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+SupplementaryGroups=docker
+# Credentials live here (0600), never in the unit or argv.
+EnvironmentFile=/etc/runlight/env
+ExecStart=/usr/local/bin/runlight \
+  --url https://github.com/asteby-hq \
+  --name runlight \
+  --min 0 --max 2 \
+  --cpus-per-runner 2 \
+  --mem-per-runner-mb 2048 \
+  --cgroup-parent runlight.slice \
+  --log-json
+# Estado persistente (suscripciones push, claves VAPID, ajustes editados desde el panel y
+# marcador de reinicio no limpio). Flags nuevos, con sus valores por defecto:
+#   --state-dir /var/lib/runlight   (vacío = push y ajustes desactivados)
+#   --vapid-subject https://runlight.asteby.com
+# El directorio debe poder escribirlo el usuario del servicio: o bien añadir
+# StateDirectory=runlight (systemd lo crea con el dueño correcto) o bien
+#   sudo install -d -o ubuntu -g ubuntu -m 0700 /var/lib/runlight
+Restart=always
+RestartSec=5
+# Runners are separate containers: restarting the daemon does not kill jobs.
+KillMode=process
+TimeoutStopSec=60
+
+# The daemon itself is tiny; keep it that way.
+MemoryMax=128M
+CPUWeight=50
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

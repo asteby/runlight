@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>runlight · orquestador de CI</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/ui.css">
+<link rel="stylesheet" href="/ui-extra.css">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" href="/logo-light.svg" type="image/svg+xml">
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<div id="splash" class="splash" role="status" aria-live="polite">
+  <svg class="rl-mark" viewBox="0 0 512 512" aria-hidden="true">
+    <rect class="tile" width="512" height="512" rx="116"/>
+    <rect class="on c1" x="64" y="64" width="87" height="87" rx="10.4"/>
+    <rect class="on c5" x="163" y="64" width="87" height="87" rx="10.4"/>
+    <rect class="on c6" x="262" y="64" width="87" height="87" rx="10.4"/>
+    <rect class="off" x="361" y="64" width="87" height="87" rx="10.4"/>
+    <rect class="on c2" x="64" y="163" width="87" height="87" rx="10.4"/>
+    <rect class="off" x="163" y="163" width="87" height="87" rx="10.4"/>
+    <rect class="off" x="262" y="163" width="87" height="87" rx="10.4"/>
+    <rect class="on c7" x="361" y="163" width="87" height="87" rx="10.4"/>
+    <rect class="on c3" x="64" y="262" width="87" height="87" rx="10.4"/>
+    <rect class="on c8" x="163" y="262" width="87" height="87" rx="10.4"/>
+    <rect class="on c9" x="262" y="262" width="87" height="87" rx="10.4"/>
+    <rect class="off" x="361" y="262" width="87" height="87" rx="10.4"/>
+    <rect class="on c4" x="64" y="361" width="87" height="87" rx="10.4"/>
+    <rect class="off" x="163" y="361" width="87" height="87" rx="10.4"/>
+    <rect class="off" x="262" y="361" width="87" height="87" rx="10.4"/>
+    <rect class="on c10" x="361" y="361" width="87" height="87" rx="10.4"/>
+  </svg>
+  <p class="splash-word">run<b>light</b></p>
+  <p class="splash-msg" id="splashmsg">Conectando con el servidor…</p>
+</div>
+<div id="app"></div>
+<noscript><p>runlight necesita JavaScript.</p></noscript>
+<script type="module" src="/app.js"></script>
+</body>
+</html>

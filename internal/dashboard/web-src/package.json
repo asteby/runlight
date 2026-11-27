@@ -1,0 +1,19 @@
+{
+  "name": "runlight-dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fuentes del dashboard de runlight. La salida (../web/app.js) se versiona y la embebe el binario Go; Node solo hace falta para compilar.",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch"
+  },
+  "dependencies": {
+    "lucide-react": "^1.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

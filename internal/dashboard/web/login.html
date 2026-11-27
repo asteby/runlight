@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Entrar · runlight</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="/logo-light.svg" type="image/svg+xml">
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
+</head>
+<body class="login-page">
+<main class="login">
+  <section class="login-card" aria-labelledby="t">
+    <div class="login-lockup"><picture><source media="(prefers-color-scheme: dark)" srcset="/logo-dark.svg"><img class="mark" src="/logo-light.svg" alt="" width="40" height="40" decoding="async"></picture><span class="word">run<b>light</b></span></div>
+    <h1 id="t">Acceso al panel</h1>
+    <p class="login-sub">Orquestador de CI de este servidor. Solo lectura.</p>
+
+    <form id="form" novalidate>
+      <label for="user">Usuario</label>
+      <input id="user" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+
+      <label for="pw">Contraseña</label>
+      <div class="pwrow">
+        <input id="pw" name="password" type="password" autocomplete="current-password" required>
+        <button type="button" id="toggle" class="ghost" aria-pressed="false" aria-label="Mostrar la contraseña">Mostrar</button>
+      </div>
+
+      <div id="err" class="formerr" role="alert" hidden><span class="ico" aria-hidden="true">✗</span><span id="errtxt"></span></div>
+      <button class="primary" id="go" type="submit">Entrar</button>
+    </form>
+
+    <p class="login-fine">Tras varios intentos fallidos el acceso se bloquea unos minutos.</p>
+  </section>
+</main>
+<script src="/login.js"></script>
+</body>
+</html>

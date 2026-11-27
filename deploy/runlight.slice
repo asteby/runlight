@@ -1,0 +1,11 @@
+[Unit]
+Description=Runlight CI runners (lower priority than production)
+
+[Slice]
+# Production units default to weight 100. Under contention CI gets ~1/5 of that.
+CPUWeight=20
+IOWeight=20
+# Hard fences so a runaway build can never push mailcow/postgres into the OOM killer.
+MemoryHigh=6G
+MemoryMax=8G
+TasksMax=4096

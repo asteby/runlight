@@ -1,0 +1,145 @@
+/* runlight - base: tokens, brand, splash and login. Components live in ui.css (and ui-extra.css).
+   Colors are the validated reference palette: categorical
+   slots 1-3 (the only ones validated for every pair), fixed per entity:
+   Production = blue, Runlight = orange. Status colors
+   always travel with an icon and a label. */
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/space-grotesk-latin-wght.woff2") format("woff2");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --font: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11, 11, 11, 0.10);
+  --prod: #2a78d6; --rl: #eb6834; --queue: #6250d6;
+  --good: #0ca30c; --good-text: #006300; --warn: #fab219; --warn-text: #7a5400; --crit: #d03b3b;
+  --wash: rgba(11, 11, 11, 0.04); --shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+    --prod: #3987e5; --rl: #d95926; --queue: #9085e9;
+    --good-text: #0ca30c; --warn-text: #fab219; --wash: rgba(255, 255, 255, 0.05);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+  --prod: #3987e5; --rl: #d95926; --queue: #9085e9;
+  --good-text: #0ca30c; --warn-text: #fab219; --wash: rgba(255, 255, 255, 0.05);
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font: 14px/1.45 var(--font);
+  /* Space Grotesk's default digits are proportional (a "1" is narrow): use the
+     tabular set everywhere so columns and counters never jitter. */
+  font-variant-numeric: tabular-nums;
+}
+button { font: inherit; color: inherit; }
+.num { font-variant-numeric: tabular-nums; }
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.word { font-weight: 700; letter-spacing: -0.03em; }
+
+/* ---------- brand ---------- */
+:root { --brand: #eb6834; }
+.headline, .tile .value, .card h2, .splash-word, .login-card h1 { font-weight: 600; letter-spacing: -0.015em; }
+
+/* Loading screen: the 3x3 grid of the mark lights its cells one by one, in the
+   order that draws the "r". Idle cells stay off, like in the logo. */
+.splash {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-content: center; justify-items: center; gap: 16px;
+  background: var(--page); transition: opacity .4s ease, visibility .4s;
+}
+.splash.hide { opacity: 0; visibility: hidden; }
+.rl-mark { width: 104px; height: 104px; display: block; }
+.rl-mark .tile { fill: #0b0b0b; }
+.rl-mark .off { fill: #232220; }
+.rl-mark .on { fill: #eb6834; transform-box: fill-box; transform-origin: center; animation: rl-light 2.6s ease-in-out infinite; }
+/* order that draws the "R": left column top to bottom, then the top bar, the bowl, the middle bar and the leg */
+.rl-mark .c1 { animation-delay: 0s; }
+.rl-mark .c2 { animation-delay: .1s; }
+.rl-mark .c3 { animation-delay: .2s; }
+.rl-mark .c4 { animation-delay: .3s; }
+.rl-mark .c5 { animation-delay: .4s; }
+.rl-mark .c6 { animation-delay: .5s; }
+.rl-mark .c7 { animation-delay: .6s; }
+.rl-mark .c8 { animation-delay: .7s; }
+.rl-mark .c9 { animation-delay: .8s; }
+.rl-mark .c10 { animation-delay: .9s; }
+@keyframes rl-light {
+  0%, 8%   { opacity: .10; transform: scale(.78); }
+  26%, 70% { opacity: 1;   transform: scale(1); }
+  90%,100% { opacity: .10; transform: scale(.78); }
+}
+.splash-word { margin: 0; font-size: 34px; line-height: 1; font-weight: 700; letter-spacing: -0.035em; color: var(--ink); }
+.splash-word b { color: var(--brand); font-weight: 700; }
+.splash-msg { margin: 0; color: var(--ink2); font-size: 13px; min-height: 18px; }
+@media (prefers-reduced-motion: reduce) {
+  .rl-mark .on { animation: none; }
+  .splash { transition: none; }
+}
+
+/* ---------- login ---------- */
+.login-page { min-height: 100vh; }
+.login {
+  min-height: 100vh; display: grid; place-items: center; padding: 24px 16px;
+  background:
+    radial-gradient(60rem 28rem at 50% -8rem, color-mix(in srgb, var(--brand) 16%, transparent), transparent 70%),
+    var(--page);
+}
+.login-card {
+  width: min(400px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  padding: 30px 28px 24px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.10);
+}
+.login-lockup { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 16px; }
+.login-lockup .mark { display: block; width: 40px; height: 40px; border-radius: 10px; }
+.login-lockup .word { font-size: 27px; line-height: 1; font-weight: 700; letter-spacing: -0.03em; }
+.word b { color: var(--brand); font-weight: inherit; }
+.login-card h1 { margin: 0 0 4px; font-size: 20px; text-align: center; }
+.login-sub { margin: 0 0 20px; color: var(--ink2); font-size: 13.5px; text-align: center; }
+.login-card form { display: grid; gap: 6px; }
+.login-card label { font-size: 13px; color: var(--ink2); margin-top: 8px; }
+.login-card input {
+  width: 100%; font: inherit; font-size: 15px; color: var(--ink); background: var(--page);
+  border: 1px solid var(--axis); border-radius: 10px; padding: 10px 12px;
+}
+.login-card input:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; border-color: transparent; }
+.pwrow { position: relative; }
+.pwrow input { padding-right: 84px; }
+.ghost {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent;
+  color: var(--ink2); font-size: 13px; padding: 6px 8px; border-radius: 8px; cursor: pointer;
+}
+.ghost:hover { background: var(--wash); color: var(--ink); }
+.ghost:focus-visible { outline: 2px solid var(--brand); }
+.formerr {
+  display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; padding: 9px 11px; border-radius: 10px; font-size: 13.5px;
+  background: color-mix(in srgb, var(--crit) 12%, transparent); border: 1px solid color-mix(in srgb, var(--crit) 40%, transparent);
+}
+.formerr[hidden] { display: none; }
+.formerr .ico { color: var(--crit); font-weight: 700; }
+.primary {
+  margin-top: 14px; width: 100%; border: 0; border-radius: 10px; padding: 11px 14px; cursor: pointer;
+  font: inherit; font-weight: 600; font-size: 15px; color: #fff; background: var(--brand);
+  transition: filter .15s, transform .05s;
+}
+.primary:hover { filter: brightness(1.06); }
+.primary:active { transform: translateY(1px); }
+.primary:disabled { opacity: .65; cursor: progress; }
+.primary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.login-fine { margin: 16px 0 0; text-align: center; color: var(--muted); font-size: 12.5px; }
