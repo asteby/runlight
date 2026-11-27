@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="brand/lockup.png" alt="runlight" width="320">
+  <img src="brand/banner.png" alt="runlight" width="100%">
 </p>
 
 <p align="center"><b>Autoscaler ligero e inteligente para runners self-hosted de GitHub Actions.</b><br>
